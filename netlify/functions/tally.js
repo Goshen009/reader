@@ -1,10 +1,8 @@
-import { sendConfirmationEmail } from "../lib/resend";
+import { sendRecoveryEmail, sendConfirmationEmail } from "../lib/resend";
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 
 const HOST = process.env.HOST;
-const JWT_SECRET = process.env.JWT_SECRET;
-const TALLY_SECRET = process.env.TALLY_SECRET;
+const TALLY_SECRETS = JSON.parse(process.env.TALLY_SECRETS);
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -25,11 +23,14 @@ export async function handler(event) {
   }
 
   const signature = event.headers["tally-signature"] ?? '';
-  const tenantId = event.headers["x-tenant-id"]; // do not default boy!
+  const tenantId = event.headers["x-tenant-id"]; // do not capitalize boy!
   const payload = event.body;
 
+  const { formId = '' } = JSON.parse(payload ?? "{}").data ?? {};
+  const secret = TALLY_SECRETS[formId]?.secret ?? '';
+
   const hash = crypto
-    .createHmac("sha256", TALLY_SECRET)
+    .createHmac("sha256", secret)
     .update(payload)
     .digest("base64");
 
@@ -40,28 +41,25 @@ export async function handler(event) {
   }
 
   const body = JSON.parse(event.body ?? "{}");
-  const fields = Array.isArray(body?.data?.fields) ? body.data.fields : null;
+  const { fields, submissionId } = body.data;
 
-  if(!fields) {
-    return {
-      statusCode: 400,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: 'Invalid Tally webhook payload' })
-    }
+  const recovery = parts.pop();
+
+  let response;
+
+  if (recovery === 'recovery') { 
+    const email = fields[0].value;
+    const recovery_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}?recovery=true`;
+
+    response = await sendRecoveryEmail(email, recovery_link);
+
+  } else {
+    const email = fields[3].value;
+    const first_name = fields[0].value;
+
+    const confirmation_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}`;
+    response = await sendConfirmationEmail(email, first_name, confirmation_link);
   }
-
-  const data = {
-    first_name: fields[0].value,
-    last_name: fields[1].value,
-    phone: fields[2].value,
-    email: fields[3].value,
-    tenant_id: tenantId
-  };
-
-  const token = jwt.sign(data, JWT_SECRET, { expiresIn: "1h"});
-  const confirmation_link = `${HOST}/confirm?token=${token}`;
-
-  const response = await sendConfirmationEmail(data.email, data.first_name, confirmation_link);
 
   if (response.isErr()) {
     return {

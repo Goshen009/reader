@@ -1,54 +1,225 @@
-import { sendLinkToApp, sendConfirmationEmail } from '../lib/resend';
-import { decodeToken } from '../lib/jwt';
+import { outpost } from '../../src/utils/outpost';
+import { templates } from '../lib/template';
 import { getClient } from '../lib/mongo';
 
-import jwt from 'jsonwebtoken';
+import dayjs from 'dayjs';
 import { ok, err } from "neverthrow";
 
-// THE FLOW!
-
-// decode the jwt
-  // if there is an error -
-    // if it's bad jwt, tell them to use the one that was emailed or try filling the form again
-    // if it's expired, create a new one, email it to them and tell them to check
-
-// try to find the user or insert if they don't exists
-  // if found
-    // we assume that the first try didn't email them the app link and they're trying again
-    // so we simply send them the app link with a jwt that includes their id (don't worry about tenantID, the readerID is also different so we can get the tenantID from there)
-    // also show an html that says they're in and should receive the email and then redirect em to whatsapp
-
-  // if not found (it's already inserted 🥴)
-    // we'll email them the app link
-    // and send an html that tells them it works which then redirects em to whatsapp
-    // (in the html say that if they don't get the app link, they should click on the confirmation link again)
-
-  // if error
-    // we'll return saying an error occured and they should try pressing the link again, if continues they should go and fill again
-
-// NOTE: on `if found` and `if not found (leads to insert)`
-// the exact same thing happens. Email the app link, show the html "You're in. Check app link" then redirect.
-// So I'll be handling them together.
-
-// NOTE: sending them the email is fire and forget
-// if they get it then great!
-// if they don't got it, then phewwwww they'll go back to use the confirmation link
 
 
-const HOST = process.env.HOST;
-const DB_NAME = process.env.DB_NAME;
-const JWT_SECRET = process.env.JWT_SECRET;
+// let's smoothen the logic
 
-const findOrInsert =  async (user) => {
+// User fills form -> gets emailed confirmation link i.e /confirm/<TENANT_ID>/<FORM_ID>/<SUBMISSION_ID>
+
+// Confirmation links gets to my server and tries to pull the data from the <SUBMISSION_ID>
+  // if it doesn't find the data,
+    // reply with an html that says it's invalid and they should use the link sent to them
+    // also say that if it continues they should fill the form again.
+  
+  // if any issues goes wrong with tally,
+    // reply with an html of an error on our part, wait a few minutes and try the link again.
+
+// In the event that the data is found
+  // check the time the response was submitted
+  // if it is more than 30 minutes ago, reply with an html telling them it's expired and they should fill the form again
+
+// If the above conditions are true, attempt to findOrInsert into the mongoDB database
+  // if it succeeds, regardless of if it found or newly inserted,
+    // respond by sending the cookie and the html of you're in along with a link to the whatsapp group
+  
+  // if it fails
+    // reply with an html of an error on our part, wait a few minutes and try the link again.
+
+
+
+// Now, how do we handle those who loose their access cookie?
+// I was thinking that they should just go back to fill the form really -- easiest for me.
+
+// If you loose your access token -- go back to fill the form.
+// But what of in the event that probably they want to revoke access to the main form?
+
+// So I'm thinking... a different tally form
+// When you fill, it takes you to the same webhook as before -- or maybe a different one that simply sends an email 
+// With a confirmation link in the same style as before
+// It comes to the same confirmation website, but has a ?recover=true at the base
+
+// it the request coming in has ?recover=true then it treats it a bit differently but everything else remains the same
+
+// and I think it's still safe cuz we're sending the form id and stuff so you can't do anything with it
+// and I'll leave the security of "someone else took my link" up to them, I sent it to your email, it's your fault if you lose it
+
+const WHATSAPP_LINKS = JSON.parse(process.env.WHATSAPP_LINKS);
+
+export async function handler(event) {
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      headers: { "Content-Type": "application/json" },
+      body: 'Method Not Allowed'
+    }
+  }
+
+  const parts = event.path.split("/");
+
+  const submissionId = parts.pop() ?? null;
+  const formId = parts.pop() ?? null;
+  const tenantId = parts.pop() ?? null;
+
+  if (!submissionId || !formId || !tenantId) {
+    return {
+      statusCode: 404,
+      headers: { "Content-Type": "text/html" },
+      body: templates.alert("This link is invalid.\nUse the link that was sent to you. (FNF)")
+    }
+  }
+  
+  const tally_response = await fetchFromTally(formId, submissionId);  
+
+  if (tally_response.isErr()) {
+    if (tally_response.error.type === "API") {
+      if (tally_response.error.status === 404) {
+        return {
+          statusCode: 404,
+          headers: { "Content-Type": "text/html" },
+          body: templates.alert("This link is invalid.\nTry again with the link that was sent to you. If it continues, please fill the form again. (SNF)")
+        }
+      } else {
+        return {
+          statusCode: tally_response.error.status,
+          headers: { "Content-Type": "text/html" },
+          body: templates.alert(`An error occurred.\nWait a few minutes and try again. If it continues, reach out. (${tally_response.error.status})`)
+        }
+      }
+    } else {
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "text/html" },
+        body: templates.alert(`An error occurred.\nWait a few minutes and try again. If it continues, reach out. (NET)`)
+      }
+    }
+  }
+
+  // check the time the submission was submitted. if it's more than 30 minutes before, call foul play.
+  const now = dayjs();
+  const difference = now.diff(dayjs(tally_response.value.submission.submittedAt), "minute");
+
+  if (difference > 30) {
+    return {
+      statusCode: 410,
+      headers: { "Content-Type": "text/html" },
+      body: templates.alert("This link has expired.\nPlease fill the form again to receive a new link.")
+    }
+  }
+
+  // it's the same endpoint for recovery and the confirm. the difference is in the ?recovery=true
+  const recoveryParameter = event.queryStringParameters?.recovery ?? '';
+
+  const confirm = async (tally_response, tenantId) => {
+    const responses = tally_response.value.submission.responses;
+
+    if (!Array.isArray(responses) || responses.length < 4) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "text/html" },
+        body: templates.alert("This link is invalid.\nUse the link that was sent to you. (400)")
+      }
+    }
+
+    const user_data = {
+      first_name: responses[0].answer,
+      last_name: responses[1].answer,
+      phone: responses[2].answer,
+      email: responses[3].answer,
+    };
+
+    const findOrInsertResult = await findOrInsert(user_data, tenantId);
+
+    if (findOrInsertResult.isErr()) {
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "text/html" },
+        body: templates.alert(`An error occurred.\nWait a few minutes and try again. If it continues, reach out. (MDB)`)
+      }
+    }
+
+    const cookie = JSON.stringify({
+      id: findOrInsertResult.value,
+      email: user_data.email,
+      name: `${user_data.first_name}`
+    });
+
+    return {
+      statusCode: 302,
+      headers: {
+        Location: WHATSAPP_LINKS[tenantId] ?? '',
+        "Set-Cookie": `tenant-${tenantId}=${encodeURIComponent(cookie)}; Path=/chapters/${tenantId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${30*24*60*60}`,
+      },
+    }
+  }
+
+  const recover = async (tally_response, tenantId) => {
+    const emailFromResponse = tally_response.value.submission.responses[0].answer;
+
+    const findUserResult = await findUser(emailFromResponse, tenantId);
+
+    if (findUserResult.isErr()) {
+      if (findUserResult.error.type === "404") {
+        return {
+          statusCode: 404,
+          headers: { "Content-Type": "text/html" },
+          body: templates.alert(`We couldn't find your email. Please fill the form.`)
+        }
+      } else {
+        return {
+          statusCode: 500,
+          headers: { "Content-Type": "text/html" },
+          body: templates.alert(`An error occurred.\nWait a few minutes and try again. If it continues, reach out. (MDB2)`)
+        }
+      }
+    }
+
+    const user = findUserResult.value;
+
+    const cookie = JSON.stringify({
+      id: user.id,
+      email: user.email,
+      name: `${user.first_name}`
+    });
+
+    return {
+      statusCode: 302,
+      headers: {
+        Location: WHATSAPP_LINKS[tenantId] ?? '',
+        "Set-Cookie": `tenant-${tenantId}=${encodeURIComponent(cookie)}; Path=/chapters/${tenantId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${30*24*60*60}`,
+      },
+    }
+  };
+
+  if (!recoveryParameter) {
+    return await confirm(tally_response, tenantId);
+  } else {
+    return await recover(tally_response, tenantId);
+  }
+}
+
+const fetchFromTally = async (formId, submissionId) => {
+  const url = `https://api.tally.so/forms/${formId}/submissions/${submissionId}`;
+  const options = { method: 'GET', headers: { 'Authorization': `Bearer ${process.env.TALLY_API_KEY}` } };
+
+  const response = await outpost(url, options);
+  return response;
+}
+
+const findOrInsert =  async (user, tenantId) => {
   try {
     const mongo = await getClient();
-    const db = mongo.db(DB_NAME);
+    const db = mongo.db(process.env.DB_NAME);
 
-    const filter = { email: user.email, tenant_id: user.tenant_id };
+    const filter = { email: user.email, tenant_id: tenantId };
     const update = {
       $setOnInsert: { 
         createdAt: new Date(),
-        tenant_id: user.tenant_id,
+        tenant_id: tenantId,
         first_name: user.first_name,
         last_name: user.last_name,
         phone: user.phone,
@@ -65,67 +236,28 @@ const findOrInsert =  async (user) => {
     else { return ok(result.lastErrorObject.upserted) }
 
   } catch (error) {
-    return err();
+    console.log(error);
+    return err(error);
   }
-}
+};
 
-export async function handler(event) {
-  if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      headers: { "Content-Type": "application/json" },
-      body: 'Method Not Allowed'
+const findUser = async (email, tenantId) => {
+  try {
+    const mongo = await getClient();
+    const db = mongo.db(process.env.DB_NAME);
+
+    const user = await db.collection("readers").findOne(
+      { email: email, tenant_id: tenantId },
+      { projection: { first_name: 1, } }
+    );
+
+    if (!user) {
+      return err({ type: '404' })
     }
+
+    return ok({ id: user._id, email: email, first_name: user.first_name });
+
+  } catch (error) {
+    return err({ type: '500' });
   }
-
-  const token = event.queryStringParameters?.token ?? '';
-
-  const decodeResult = decodeToken(token);
-  if (decodeResult.isErr()) {
-    if (decodeResult.error.type === 'Expired') {
-      const { iat, exp, ...data } = decodeResult.error.payload;
-
-      const token = jwt.sign(data, JWT_SECRET, { expiresIn: "1h"});
-      const confirmation_link = `${HOST}/confirm?token=${token}`;
-      
-      await sendConfirmationEmail(data.email, data.first_name, confirmation_link);
-
-      return {
-        statusCode: 400,
-        body: `You've gotten a new confirmation email!`
-      }
-    } else if (decodeResult.error.type === 'Invalid') {
-      return {
-        statusCode: 400,
-        body: `It's invalid, use the one from the confirmation email or fill the form again`
-      }
-    } else {
-      return {
-        statusCode: 400,
-        body: `Some other error, fill the form again`
-      }
-    }
-  }
-
-  const user = decodeResult.value;
-  const findOrInsertResult = await findOrInsert(user);
-
-  if (findOrInsertResult.isErr()) {
-    return {
-      statusCode: 500,
-      body: `An actual server error, but they don't know that. So I'll tell them to use the confirmation email, wait a few minutes try again and if it persists, they should fill the form again.`
-    }
-  }
-
-  const id = findOrInsertResult.value;
-
-  // now to email em the link to the app.
-  const app_token = jwt.sign({ id: id }, JWT_SECRET);
-  const app_link = `${HOST}?token=${app_token}`;
-
-  await sendLinkToApp(user.email, user.first_name, app_link); // i don't care about the result here, they can always re-click the confirmation link to get the stuff again
-
-  return {
-    statusCode: 200,
-  }
-}
+};

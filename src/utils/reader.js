@@ -7,10 +7,25 @@ export function createReader() {
   const load = (data) => {
     isScheduleCompleted = data.isScheduleCompleted;
     chapters = data.chapters;
-    
-    const pageReached = data.pageReached;
-    return { pageReached };
   };
+
+  const getCurrentChapter = (pageNumber) => {
+    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
+    return currentIndex === -1 ? null : chapters[currentIndex];
+  };
+
+  const getPreviousChapter = (pageNumber) => {
+    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
+    return (currentIndex > 0) ? chapters[currentIndex - 1] : null;
+  };
+
+  const getNextChapter = (pageNumber) => {
+    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
+    return (currentIndex !== -1 && currentIndex < chapters.length - 1) ? chapters[currentIndex + 1] : null;
+  };
+
+
+
 
   const newMaxPage = async () => {
     const params = new URLSearchParams(window.location.search);
@@ -32,21 +47,6 @@ export function createReader() {
   };
 
   const getIsScheduleCompleted = () => isScheduleCompleted;
-
-  const getCurrentChapter = (pageNumber) => {
-    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
-    return currentIndex === -1 ? null : chapters[currentIndex];
-  };
-
-  const getPreviousChapter = (pageNumber) => {
-    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
-    return (currentIndex > 0) ? chapters[currentIndex - 1] : null;
-  };
-
-  const getNextChapter = (pageNumber) => {
-    const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
-    return (currentIndex !== -1 && currentIndex < chapters.length - 1) ? chapters[currentIndex + 1] : null;
-  };
 
 
   return { load, newMaxPage, getIsScheduleCompleted, getCurrentChapter, getPreviousChapter, getNextChapter };

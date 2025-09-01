@@ -1,9 +1,25 @@
-import { decodeToken } from '../lib/jwt';
 import { getClient } from '../lib/mongo';
-import { ObjectId } from 'mongodb';
-import dayjs from 'dayjs';
 
-const DB_NAME = process.env.DB_NAME;
+import dayjs from 'dayjs';
+import { ObjectId } from 'mongodb';
+
+const extractToken = (event, tenantId) => {
+  const cookieHeader = event.headers.cookie || '';
+
+  const cookies = cookieHeader.split(';').reduce((acc, c) => {
+    const [name, value] = c.trim().split('=');
+    acc[name] = value;
+    return acc;
+  }, {});
+
+  const cookie = cookies[`tenant-${tenantId}`] ?? null;
+
+  if (!cookie) {
+    return null;
+  }
+
+  return JSON.parse(decodeURIComponent(cookie));
+}
 
 export async function handler(event) {
   if (event.httpMethod !== 'GET') {
@@ -12,23 +28,25 @@ export async function handler(event) {
     }
   }
 
-  const token = event.queryStringParameters?.token ?? '';
+  const parts = event.path.split('/');
+  const tenantId = parts.pop() ?? '';
 
-  const decodeResult = decodeToken(token);
-  if (decodeResult.isErr()) {
-    return {
+  const cookie = extractToken(event, tenantId);  
+
+  if (!cookie) {
+    return { 
       statusCode: 400,
-      body: `error decoding token`
-    }
+      body: 'Cookie missing' 
+    };
   }
 
   try {
     const mongo = await getClient();
-    const db = mongo.db(DB_NAME);
+    const db = mongo.db(process.env.DB_NAME);
 
     const user = await db.collection("readers").findOne(
-      { _id: ObjectId.createFromHexString(decodeResult.value.id) },
-      { projection: { tenant_id: 1, page_reached: 1, _id: 0 } }
+      { _id: ObjectId.createFromHexString(cookie.id) },
+      { projection: { page_reached: 1, _id: 0 } }
     );
 
     if (!user) {
@@ -37,8 +55,6 @@ export async function handler(event) {
         body: `User not found`
       }
     }
-
-    const tenantId = user.tenant_id;
 
     // handling release schedule
     const release_schedule = await db.collection("release-schedule").findOne(
@@ -79,10 +95,11 @@ export async function handler(event) {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isScheduleCompleted, pageReached, chapters })
+      body: JSON.stringify({ userEmail: cookie.email, userName: cookie.name, isScheduleCompleted, pageReached, chapters })
     }
 
   } catch (err) {
+    console.log(err);
     return {
       statusCode: 500,
       body: `MongoDB error`

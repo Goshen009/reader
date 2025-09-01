@@ -10,7 +10,13 @@
   force = true
 
 [[redirects]]
-  from = "/confirm"
-  to = "/.netlify/functions/confirm"
+  from = "/confirm/*"
+  to = "/.netlify/functions/confirm/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/chapters/*"
+  to = "/.netlify/functions/chapters/:splat"
   status = 200
   force = true
