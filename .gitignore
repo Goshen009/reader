@@ -28,7 +28,6 @@ dist-ssr
 
 .env
 jsons
-index.html
 oldReader.txt
 test.html
 test.txt
