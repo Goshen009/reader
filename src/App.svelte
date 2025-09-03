@@ -10,12 +10,6 @@
 
   import Reader2 from "./lib/Reader2.svelte";
 
-  const test = import.meta.env.VITE_TESTING_KEY;
-
-  const val = `help: ${import.meta.env.VITE_TESTING_KEY}`;
-
-  console.log(val);
-
   let data = null;
 
   onMount(async () => {
