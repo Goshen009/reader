@@ -29,8 +29,18 @@ dist-ssr
 .env
 jsons
 oldReader.txt
+oldReader2.txt
 test.html
 test.txt
 oldFunctions.txt
+
+/preprocessing-python/output_whitespace.json
+/preprocessing-python/output_words.json
+/preprocessing-python/outputFromDocx.json
+/preprocessing-python/Letter019.docx
+
+/public/apptestold.json
+/public/book_paragraphs.json
+/public/response.json
 
 /preprocessing-python/venv

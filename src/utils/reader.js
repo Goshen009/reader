@@ -2,12 +2,22 @@ import { outpost } from "./outpost";
 
 export function createReader() {
   let isScheduleCompleted = false;
+  let blocks = [];
+  let toc = [];
+
   let chapters = [];
 
+  const getBlocks = () => blocks;
+
   const load = (data) => {
-    isScheduleCompleted = data.isScheduleCompleted;
-    chapters = data.chapters;
+    ({ isScheduleCompleted, chapters, blocks, toc } = data);
   };
+
+  const save = (blockReached) => {
+    
+  }
+
+  
 
   const getCurrentChapter = (pageNumber) => {
     const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
@@ -49,5 +59,5 @@ export function createReader() {
   const getIsScheduleCompleted = () => isScheduleCompleted;
 
 
-  return { load, newMaxPage, getIsScheduleCompleted, getCurrentChapter, getPreviousChapter, getNextChapter };
+  return { load, getBlocks, newMaxPage, getIsScheduleCompleted, getCurrentChapter, getPreviousChapter, getNextChapter };
 }

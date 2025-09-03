@@ -1,12 +1,139 @@
 <script lang="ts">
-  import { createReader } from "../utils/reader";
-  import { createTimer } from "../utils/timer";
-  import { onMount } from "svelte";
+  import RewardButton from "./RewardButton.svelte";
 
-  import PageMode from "./PageMode.svelte";
-  import ScrollMode from "./ScrollMode.svelte";
+  let currentParagraphId = null;  // shared state
 
-  import View from "./View.svelte";
+  let visibleParagraphs = $state([]);
+
+   // 1. Create observer once
+  const paragraphObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.id;
+      if (entry.isIntersecting) {
+        if (!visibleParagraphs.includes(id)) visibleParagraphs.push(id);
+      } else {
+        visibleParagraphs = visibleParagraphs.filter(p => p !== id);
+      }
+    });
+  }, { threshold: 0.6 }); // visible if 60% in view
+
+  // Returns the topmost visible paragraph
+// function getTopmostParagraph() {
+//   const visible = Array.from(visibleParagraphs); // from your Set
+//   if (visible.length === 0) return null;
+
+//   return visible.reduce((topmost, current) => {
+//     const topTop = topmost.getBoundingClientRect().top;
+//     const currentTop = current.getBoundingClientRect().top;
+//     return currentTop < topTop ? current : topmost;
+//   });
+// }
+
+// Returns the topmost visible paragraph
+function getTopmostParagraph() {
+  if (visibleParagraphs.length === 0) return null;
+
+  return visibleParagraphs
+    .map(id => document.getElementById(id))   // convert ID → element
+    .filter(el => el !== null)                // ignore if not found
+    .reduce((topmost, current) => {
+      const topTop = topmost.getBoundingClientRect().top;
+      const currentTop = current.getBoundingClientRect().top;
+      return currentTop < topTop ? current : topmost;
+    });
+}
+
+
+function canUserScroll() {
+  return document.documentElement.scrollHeight > window.innerHeight;
+}
+
+
+
+  // The observer keeps this updated
+  // const paragraphObserver = new IntersectionObserver((entries) => {
+  //   const visible = entries
+  //     .filter(e => e.isIntersecting)
+  //     .map(e => e.target);
+
+  //   if (visible.length > 0) {
+  //     // Pick the first visible one in document order
+  //     visible.sort((a, b) => a.offsetTop - b.offsetTop);
+  //     currentParagraphId = visible[0].id;
+  //   }
+  // }, { threshold: 0.5 }); // 50% visible before we "count it"
+
+
+  // const observer = new IntersectionObserver((entries) => {
+  //   entries.forEach(entry => {
+  //     if (entry.isIntersecting) {
+  //       console.log("Visible:", entry.target.id);
+  //     } else {
+  //       console.log("Not visible:", entry.target.id);
+  //     }
+  //   });
+  // }, { threshold: 0.5 }); // 50% visible counts as "in view"
+
+
+
+
+
+
+
+
+
+//   function createParagraphObserver(callback) {
+//     const observer = new IntersectionObserver((entries) => {
+//       const visibleParagraphs = [];
+
+//       for(const entry of entries) {
+//         if (entry.isIntersecting) {
+//           visibleParagraphs.push(entry.target)
+//         }
+//       }
+
+//       callback(visibleParagraphs);
+//     }, {
+//       root: null,
+//       threshold: 0.1
+//     });
+
+//     return observer;
+//   }
+
+// // --- USAGE EXAMPLE ---
+
+// // 1. Create the observer
+// const paragraphObserver = createParagraphObserver((visible) => {
+//   console.log("Currently visible paragraphs:", visible.map(p => p.id));
+// });
+
+// // 2. Attach it to all paragraphs
+// document.querySelectorAll("p[id^='paragraph-']").forEach(p => {
+//   paragraphObserver.observe(p);
+// });
+
+
+//   function createPageObserver(callback) {
+//   const observer = new IntersectionObserver((entries) => {
+//     let maxPage = 0;
+//     for (const entry of entries) {
+//       if (entry.isIntersecting) {
+//         const pageNum = parseInt(entry.target.page, 10);
+//         maxPage = Math.max(maxPage, pageNum);
+//       }
+//     }
+
+//     const canScroll = document.body.scrollHeight > window.innerHeight;
+//     callback({ currentPage: maxPage, canScroll });  
+//   }, {
+//     root: null,
+//     threshold: 0.5, // half of element visible counts
+//   });
+
+//   return observer;
+// }
+
 
   const { data } = $props();
   const { userEmail, userName } = data;
@@ -15,169 +142,194 @@
   const reader = createReader();
   const countdown = timer.countdown;
 
-  let pageList = $state([]);
+  let pageReached = $state(0);
 
-  let pageReached = $state(data.pageReached);
-  let readingMode = $state(localStorage.getItem(`${userEmail}:readingMode`) ?? "chapter");
-  let currentPage = $state(Number(localStorage.getItem(`${userEmail}:currentPage`) ?? 4));
+
+  // let's see.
+  // we have the maximum page reached
+
+  // as each page is revealed.
+  // the maximum page reached is increased
+
+
+  // for next, check the maximum page reached
+  // check the page number of the last page in that chapter
+  // if the maximum page is greater than it, then allow next
+  // if it is less than, do not allow -- you've not reached
+  // if it is equal, then you're just about to switch
+
+
+  
+
+  let pageList = $state(null);
+  let lastPageNumber = $derived(pageList[pageList.length -1].number);
+
+  let currentPage = $state(Number(localStorage.getItem(`${userEmail}:currentPage`) ?? 0));
+
+  const loadPageReached = () => {
+    return Number(localStorage.getItem(`${userEmail}:pageReached`) ?? 0);
+  }
+
+  const savePageReached = (val) => {
+    localStorage.setItem(`${userEmail}:pageReached`, String(val));
+  }
+
+  // onMount(() => {
+  //   reader.load(data);
+
+  //   blocks = reader.getBlocks();
+  //   blockReached = data.blockReached;
+
+  //   // pageReached = loadPageReached();
+
+  //   // currentPage = 0;
+  //   // pageList = reader.getCurrentChapter(currentPage).pages;
+
+  //   // startTimer();
+  //   start();
+  // });
+
+  // let intervalId = null;
+
+  // const startTimer = () => {
+
+  //   // I only want to increment the pageReached on when?
+  //   // Because in the advent that someone scrolls to a different chapter
+  //   // Will this timer keep on increasing the pageReached?
+
+  //   // So what's an idea here?
+
+  //   intervalId = setInterval(() => {
+  //     pageReached += 1; // do some checks here sha.
+
+  //     if (pageReached % 5 === 0) {
+  //       savePageReached(pageReached);
+  //     }
+  //   }, 3000);
+  // }
+
+  const start = () => {
+    const interval = setInterval(() => {
+      console.log(getTopmostParagraph())
+      console.log(`can user scroll: ${canUserScroll()}`)
+
+      if (currentPage < lastPageNumber) {
+        currentPage += 1;
+        localStorage.setItem(`${userEmail}:currentPage`, String(currentPage));
+      } else {
+        clearInterval(interval);
+      }
+    }, 3000);
+  }
+
+  const next = () => {
+    pageList = reader.getNextChapter(currentPage).pages;
+    start();
+
+    // make a call to the db that the user has finished that chapter
+    // it loads until it's done.
+  }
+
+  const onClickPrevious = () => {
+    pageList = reader.getPreviousChapter(currentPage);
+  }
+
+
+  
+  import { createReader } from "../utils/reader";
+  import { createTimer } from "../utils/timer";
+  
+  import { SvelteSet } from 'svelte/reactivity';
+  import { onMount } from "svelte";
+  
+  import ChapterHeader from "./ChapterHeader.svelte";
+  import Paragraph from "./Paragraph.svelte";
+  import Panel from "./Panel.svelte";
+
+
+  let darkMode = $state(localStorage.getItem('theme') === 'dark' || localStorage.getItem('theme') === null);
+  let visibleBlocks = $state(new SvelteSet<number>());
+  let intervalId = $state(null);
+
+  let blocks = $state(null); // the json array of blocks i.e paragraphs
+  let blockReached = $state(0); // the stored 'paragraph number' on the server
+  let currentChapter = $state(localStorage.getItem(`${userEmail}:currentChapter`) ?? 'Chapter-1'); // used for navigation -- either by # (deep link) or swiping.
+
+  const toggleTheme = () => {
+    darkMode = !darkMode;
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }
 
   onMount(() => {
     reader.load(data);
+    blocks = reader.getBlocks();
+    blockReached = data.blockReached;
 
-    if (currentPage > pageReached) {
-      currentPage = pageReached;
-    }
+    startTimer();
+  });
 
-    pageList = reader.getCurrentChapter(currentPage)?.pages ?? null;
-    if (!pageList) {
-      alert("no page list. fix")
-      return;
-    }
-
-    pageList.forEach(element => {
-      console.log(JSON.stringify(element))
-    });
-
-    console.log(JSON.stringify(pageList));
-
-    // lets get all the pages for that chapter up to where they have reached.
-
-
-
-
-    // so, what do we want to do now?
-    // we've got the page they've reached right?
-
-    // let's have this
-    // it'll show all the pages in that chapter up to where you've reached.
-    // and then at the end -- you can swipe to go to the next chapter OR it's continous scroll
-
-    // views is responsible for the background colour and fontsize. it just takes in the pages and displays them
-    // reader is responsible for either swipe to next chapter OR continuous scolling (OR maybe, full swipe mode).
-  })
-
-
-
-
-  // let userEmail = null;
-  let isLoading = $state(true);
-  
-  let storedMaxPage = $state(0);
-  // let currentPage = $state(0);
-
-  
-  let pageMap = $derived(Object.fromEntries(pageList.map(p => [p.number, p])));
-  let disableNextButton = $derived((currentPage === storedMaxPage && $countdown > 0));
-  
-  let visiblepages = $derived(pageList.filter(p => p.number <= storedMaxPage));
-  
-  // onMount(async () => {
-  //   // NOTE: The keys here will be 'user-email:variable' e.g 'goshen009@gmail.com:currentPage'
-  //   // TAKE NOTE! I'M YET TO SEE HOW TO SOLVE THIS!
-
-  //   const info = reader.load(data);
-  //   // storedMaxPage = info.pageReached;
-
-  //   storedMaxPage = Number(localStorage.getItem(`${userEmail}:storedMaxPage`)) ?? 0;
-  //   currentPage = Number(localStorage.getItem(`${userEmail}:currentPage`)) ?? 0;
-  //   readingMode = localStorage.getItem(`${userEmail}:readingMode`) ?? "page";
-
-    // pageList = reader.getCurrentChapter(currentPage).pages;
-
-  //   // I haven't done a check here to know if the current page is null (user tampering w it or bugs)
-
-  //   if (currentPage === storedMaxPage) {
-  //     timer.start();
-  //   }
-  // });
-
-  const onClickedNext = () => {
-    if (!pageMap[currentPage + 1]) {
-      const nextChapter = reader.getNextChapter(currentPage);
-
-      if (!nextChapter) {
-        if (reader.getIsScheduleCompleted()) {
-          alert("You're at the end of the book!");
+  const startTimer = () => {
+    intervalId = setInterval(() => {
+      if (visibleBlocks.size > 0) {
+        const maxVisible = Math.max(...visibleBlocks);
+        if (maxVisible >= blockReached - 5) {
+          blockReached += 1;
         } else {
-          alert("Come back again tomorrow for more");
+          console.log("User scrolled too far up, pausing gating");
         }
-        
-        return;
-      } 
-      
-      pageList = nextChapter.pages;
-    }
-
-    if (currentPage === storedMaxPage) {
-      timer.start();
-
-      // NOTE: In reality, it will save this to the database instead of local storage
-      storedMaxPage++;
-      localStorage.setItem("maxPageReached", String(storedMaxPage));
-    }
-
-    currentPage++;
-    localStorage.setItem(`${userEmail}:currentPage`, String(currentPage));
-  }
-
-  const onPageClickedPrevious = () => {
-    if (!pageMap[currentPage - 1]) {
-      const previousChapter = reader.getPreviousChapter(currentPage);
-
-      if (!previousChapter) {
-        alert("You're at the beginning of the book!");
-        return;
+      } else {
+        blockReached += 1;
       }
 
-      pageList = previousChapter.pages;
+      if (blockReached % 5 === 0) {
+        savePageReached(pageReached); // change this to be the actual saving part. hand it off to reader.
+      }
+    }, 3000);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const el = entry.target as HTMLElement;
+      const num = parseInt(el.dataset.number);
+
+      if (entry.isIntersecting) {
+        visibleBlocks.add(num);
+      } else {
+        visibleBlocks.delete(num);
+      }
+    });
+  }, {
+    root: null,
+    threshold: 0.5
+  });
+
+  const observe = (element: HTMLElement) => {
+    observer.observe(element);
+    return {
+      destroy() {
+        observer.unobserve(element);
+      }
     }
-
-    currentPage--;
-    localStorage.setItem(`${userEmail}:currentPage`, String(currentPage));
-  };
-
-  const onScrollClickedPrevious = () => {
-    const previousChapter = reader.getPreviousChapter(currentPage);
-
-    if (!previousChapter) {
-      alert("You're at the beginning of the book!");
-      return;
-    } 
-      
-    pageList = previousChapter.pages;
-    
-    currentPage = previousChapter.endPage;
-    localStorage.setItem(`${userEmail}:currentPage`, String(currentPage));
-  };
-
+  }
+  
 </script>
 
-<main>
+<div class={`min-h-screen p-6 transition-colors duration-500 ${darkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-300 text-gray-900'}`}>
+  <div class="max-w-xl mx-auto bg-inherit">
+    {#if blocks}
+      {#each blocks as block, index}
+        {#if block.type}
+          {#if block.number <= blockReached} <!-- only show the paragraphs up to where the system has revealed -->
+            <ChapterHeader {block} {observe}/>
+          {/if}
+        {:else}
+          {#if block.number <= blockReached}
+            <Paragraph {block} {observe}/>
+          {/if}
+        {/if}
+      {/each}
+    {/if}
 
-  <View {pageList} {pageReached} {currentPage} {readingMode}/>
-
-  <!-- <p>Timer: {$countdown > 0 ? $countdown : "Completed"}</p>
-
-  <button onclick={() => readingMode = readingMode === "page" ? "scroll" : "page"}>Switch to {readingMode === "page" ? "Scroll" : "Page"}</button> -->
-
-  <!-- {#if isLoading}
-    <p>Loading pages... ⏳</p>
-  {:else} -->
-    <!-- {#if readingMode === 'page'}
-      <PageMode
-        page={pageMap[currentPage]}
-        onClickedNext={onClickedNext}
-        onClickedPrevious={onPageClickedPrevious}
-        disableNextButton={disableNextButton}
-      />
-    {:else}
-      <ScrollMode 
-        pages={visiblepages}
-        onClickedNext={onClickedNext}
-        disableNextButton={disableNextButton}
-        onClickedPreviousChapter={onScrollClickedPrevious}
-      />
-    {/if} -->
-  <!-- {/if} -->
-
-</main>
+    <Panel {toggleTheme} {onClickPrevious} {reader} {currentPage} {darkMode}/>    
+  </div>
+</div>

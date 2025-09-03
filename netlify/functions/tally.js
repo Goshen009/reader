@@ -62,6 +62,7 @@ export async function handler(event) {
   }
 
   if (response.isErr()) {
+    console.log(response.error)
     return {
       statusCode: 500,
       body: JSON.stringify({ "error": response.error })
