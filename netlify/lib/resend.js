@@ -1,4 +1,4 @@
-import { outpost } from '../../src/utils/outpost';
+import { outpost } from "./outpost";
 
 const method = 'POST';
 const url = 'https://api.resend.com/emails';
