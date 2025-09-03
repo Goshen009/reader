@@ -1,6 +1,4 @@
 <script lang="ts">
-  import RewardButton from "./RewardButton.svelte";
-
   let currentParagraphId = null;  // shared state
 
   let visibleParagraphs = $state([]);
@@ -236,6 +234,7 @@ function canUserScroll() {
 
 
   
+  
   import { createReader } from "../utils/reader";
   import { createTimer } from "../utils/timer";
   
@@ -266,6 +265,9 @@ function canUserScroll() {
     blockReached = data.blockReached;
 
     startTimer();
+
+    reader.save(50);
+    reader.save(55);
   });
 
   const startTimer = () => {

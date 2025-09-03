@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
 
   import ParagraphSkeleton from "./ParagraphSkeleton.svelte";
-  import Paragraph from "./Paragraph.svelte";
+  // import Paragraph from "./Paragraph.svelte";/
   
 
   // let paragraphs = $state([]);

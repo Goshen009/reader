@@ -5,7 +5,12 @@ export function createReader() {
   let blocks = [];
   let toc = [];
 
-  let chapters = [];
+  let queue = [];
+  let failureCount = 0;
+  let retryTimerId = null;
+
+  // set the retry time to 30s instead please
+
 
   const getBlocks = () => blocks;
 
@@ -13,11 +18,63 @@ export function createReader() {
     ({ isScheduleCompleted, chapters, blocks, toc } = data);
   };
 
-  const save = (blockReached) => {
-    
+  const saveResponse = async (blockReached) => {
+    const url = '/newpage';
+    const options = { method: 'GET', headers: { 'Content-Type': 'application/json' } };
+
+    const response = await outpost(url, options);
+    return response;
   }
 
-  
+  const save = async (blockReached) => {
+    const response = await saveResponse(blockReached);
+
+    if (response.isErr()) {
+      queue.push(blockReached);
+      failureCount += 1;
+
+      if (failureCount >= 2) {
+        scheduleRetry();
+      }      
+    } else {
+      clearRetry();
+    }
+  }
+
+  const scheduleRetry = () => {
+    if (retryTimerId) return;
+
+    const waitTime = 2 * 1000; // hmmmm, many seconds?
+
+    retryTimerId = setTimeout(async () => {
+      retryTimerId = null;
+      if (queue.length === 0) return;
+
+      const maxBlock = Math.min(...queue);
+      const result = await saveResponse(maxBlock);
+
+      if (result.isErr()) {
+        failureCount++
+        scheduleRetry();
+      } else {
+        clearRetry();
+      }
+    }, waitTime);
+  }
+
+  const clearRetry = () => {
+    if (retryTimerId) {
+      clearTimeout(retryTimerId);
+
+      queue = [];
+      failureCount = 0;
+      retryTimerId = null;
+    }
+  }
+
+
+
+  let chapters = [];
 
   const getCurrentChapter = (pageNumber) => {
     const currentIndex = chapters.findIndex(ch => pageNumber >= ch.start_page && pageNumber <= ch.end_page);
@@ -59,5 +116,5 @@ export function createReader() {
   const getIsScheduleCompleted = () => isScheduleCompleted;
 
 
-  return { load, getBlocks, newMaxPage, getIsScheduleCompleted, getCurrentChapter, getPreviousChapter, getNextChapter };
+  return { load, save, getBlocks, newMaxPage, getIsScheduleCompleted, getCurrentChapter, getPreviousChapter, getNextChapter };
 }

@@ -1,8 +1,5 @@
-import { sendRecoveryEmail, sendConfirmationEmail } from "../lib/resend";
+import { getClient } from '../lib/mongo';
 import crypto from 'crypto';
-
-const HOST = process.env.HOST;
-const TALLY_SECRETS = JSON.parse(process.env.TALLY_SECRETS);
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -25,56 +22,65 @@ export async function handler(event) {
   const signature = event.headers["tally-signature"] ?? '';
   const tenantId = event.headers["x-tenant-id"]; // do not capitalize boy!
   const payload = event.body;
-
+  
   const { formId = '' } = JSON.parse(payload ?? "{}").data ?? {};
-  const secret = TALLY_SECRETS[formId]?.secret ?? '';
 
+  const TALLY_SECRETS = JSON.parse(process.env.TALLY_SECRETS);
+  const secret = TALLY_SECRETS[formId]?.secret ?? '';
+  
   const hash = crypto
     .createHmac("sha256", secret)
     .update(payload)
     .digest("base64");
-
+  
   if (hash !== signature || !tenantId) {
     return {
       statusCode: 401,
     }
   }
-
+  
   const body = JSON.parse(event.body ?? "{}");
-  const { fields, submissionId } = body.data;
-
-  const recovery = parts.pop();
+  const { fields } = body.data;
 
   const fieldMap = Object.fromEntries(
     fields.map(f => [f.label, f.value])
   );
 
-  let response;
+  try {
+    const mongo = await getClient();
+    const db = mongo.db(process.env.DB_NAME);
 
-  if (recovery === 'recovery') { 
-    const email = fieldMap["Email"];
-    const recovery_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}?recovery=true`;
+    const filter = { email: fieldMap["Email"], tenant_id: tenantId };
+    const update = {
+      $setOnInsert: { 
+        createdAt: new Date(),
+        tenant_id: tenantId,
+        first_name: fieldMap['First name'],
+        last_name: fieldMap['Last name'],
+        phone: fieldMap['Phone number'],
+        email: fieldMap['Email'],
+        page_reached: 0,
+      }
+    };
+    const options = { upsert: true, includeResultMetadata: true };
 
-    response = await sendRecoveryEmail(email, recovery_link);
+    const result = await db.collection('readers').findOneAndUpdate(filter, update, options);
+    const found = result.lastErrorObject.updatedExisting;
 
-  } else {
-    const email = fieldMap["Email"];
-    const first_name = fieldMap["First name"];
+    let body = '';
 
-    const confirmation_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}`;
-    response = await sendConfirmationEmail(email, first_name, confirmation_link);
-  }
+    if (found) body = JSON.stringify({ "id": result.value._id, "state": "found" })
+    else body = JSON.stringify({ "id": result.lastErrorObject.upserted, "state": "inserted"})
 
-  if (response.isErr()) {
-    console.log(response.error)
+    return {
+      statusCode: 200,
+      body
+    }
+
+  } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ "error": response.error })
+      body: JSON.stringify({ "error": error })
     }
-  }
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ "data": response.value })
   }
 }

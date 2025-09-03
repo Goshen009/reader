@@ -1,6 +1,6 @@
 <script lang="ts">
   import SkeletonPage from "./SkeletonPage.svelte";
-  import Page from "./Page.svelte";
+  // import Page from "./Page.svelte";
 
   const { countdown, pageList, pageReached, currentPage, readingMode, revealNextPage } = $props();
 
@@ -122,7 +122,7 @@
   {/each} -->
 
   {#each words as page }
-    <Page content={page.content} {backgroundColour} {fontSize} />
+    <!-- <Page content={page.content} {backgroundColour} {fontSize} /> -->
   {/each}
 </div>
 

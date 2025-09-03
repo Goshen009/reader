@@ -21,5 +21,11 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/newpage"
+  to = "/.netlify/functions/newpage"
+  status = 200
+  force = true
+
 [functions]
   node_bundler = "esbuild"

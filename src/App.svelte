@@ -4,12 +4,6 @@
 
   import Reader from "./lib/Reader.svelte";
 
-  import Test from "./lib/Test.svelte";
-
-  import Chapter from "./lib/Chapter.svelte";
-
-  import Reader2 from "./lib/Reader2.svelte";
-
   let data = null;
 
   onMount(async () => {
@@ -42,10 +36,4 @@
   {#if data}
     <Reader {data}/>
   {/if}
-
-  <!-- <Test/> -->
-
-  <!-- <Chapter /> -->
-
-  <!-- <Reader2/> -->
 </main>
