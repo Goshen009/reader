@@ -133,12 +133,16 @@ export async function handler(event) {
       return acc;
     }, {});
 
+    console.log(JSON.stringify(responsesByTitle))
+
     const user_data = {
-      first_name: responsesByTitle["First Name"],
-      last_name: responsesByTitle["Last Name"],
-      phone: responsesByTitle["Email"],
-      email: responsesByTitle["Phone Number"]
+      first_name: responsesByTitle["First name"],
+      last_name: responsesByTitle["Last name"],
+      phone: responsesByTitle["Phone number"],
+      email: responsesByTitle["Email"]
     };
+
+    console.log(JSON.stringify(user_data))
 
     const findOrInsertResult = await findOrInsert(user_data, tenantId);
 
