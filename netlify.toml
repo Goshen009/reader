@@ -20,3 +20,6 @@
   to = "/.netlify/functions/chapters/:splat"
   status = 200
   force = true
+
+[functions]
+  node_bundler = "esbuild"
