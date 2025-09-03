@@ -45,17 +45,21 @@ export async function handler(event) {
 
   const recovery = parts.pop();
 
+  const fieldMap = Object.fromEntries(
+    fields.map(f => [f.label, f.value])
+  );
+
   let response;
 
   if (recovery === 'recovery') { 
-    const email = fields[0].value;
+    const email = fieldMap["Email"];
     const recovery_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}?recovery=true`;
 
     response = await sendRecoveryEmail(email, recovery_link);
 
   } else {
-    const email = fields[3].value;
-    const first_name = fields[0].value;
+    const email = fieldMap["Email"];
+    const first_name = fieldMap["First name"];
 
     const confirmation_link = `${HOST}/confirm/${tenantId}/${formId}/${submissionId}`;
     response = await sendConfirmationEmail(email, first_name, confirmation_link);

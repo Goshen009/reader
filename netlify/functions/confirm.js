@@ -125,11 +125,19 @@ export async function handler(event) {
       }
     }
 
+    const { questions, submission } = tally_response.value;
+
+    const responsesByTitle = submission.responses.reduce((acc, r) => {
+      const question = questions.find(q => q.id === r.questionId);
+      if (question) acc[question.title] = r.answer;
+      return acc;
+    }, {});
+
     const user_data = {
-      first_name: responses[0].answer,
-      last_name: responses[1].answer,
-      phone: responses[2].answer,
-      email: responses[3].answer,
+      first_name: responsesByTitle["First Name"],
+      last_name: responsesByTitle["Last Name"],
+      phone: responsesByTitle["Email"],
+      email: responsesByTitle["Phone Number"]
     };
 
     const findOrInsertResult = await findOrInsert(user_data, tenantId);
