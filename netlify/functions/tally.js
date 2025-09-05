@@ -1,4 +1,4 @@
-import { getClient } from '../lib/mongo';
+import { getDB } from '../lib/mongo';
 import crypto from 'crypto';
 
 export async function handler(event) {
@@ -47,8 +47,7 @@ export async function handler(event) {
   );
 
   try {
-    const mongo = await getClient();
-    const db = mongo.db(process.env.DB_NAME);
+    const db = await getDB();
 
     const filter = { email: fieldMap["Email"], tenant_id: tenantId };
     const update = {
@@ -59,7 +58,7 @@ export async function handler(event) {
         last_name: fieldMap['Last name'],
         phone: fieldMap['Phone number'],
         email: fieldMap['Email'],
-        page_reached: 0,
+        block_reached: 0,
       }
     };
     const options = { upsert: true, includeResultMetadata: true };

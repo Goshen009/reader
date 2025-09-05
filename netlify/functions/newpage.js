@@ -1,7 +1,5 @@
-import { getClient } from "../lib/mongo";
-import { ObjectId } from 'mongodb';
-
-// MAKE THE COOKIE BE ON THE MAIN PATH / SO THAT EVERYONE CAN ACCESS IT!
+import { getDB } from "../lib/mongo";
+import { findCookie, parseID } from "../lib/utils";
 
 export async function handler(event) {
   if (event.httpMethod !== 'PATCH') {
@@ -11,14 +9,11 @@ export async function handler(event) {
   }
 
   const origin = event.headers.origin;
-  const apiKey = event.headers["x-api-key"];
-  const cookies = event.headers.cookie || "";
-
   if (origin) {
     if (origin !== process.env.HOST) {
       return {
         statusCode: 401,
-        body: JSON.stringify({ error: "Unauthorized: Missing/invalid API key" }),
+        body: JSON.stringify({ error: "Unauthorized: Missing/invalid API key No host" }),
       };
     }
   } else {
@@ -28,10 +23,20 @@ export async function handler(event) {
     };
   }
 
-  // we'd need the tenantID over here for the cookie-name
+  const tenantId = event.headers["x-tenant-id"];
+  if (!tenantId) {
+    return {
+      statusCode: 404,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error : "No tenant_id found", errorType: 'TENANT' })
+    }
+  }
 
-  const cookie = parseCookie(cookies, "cookie-name");
-  if (!cookie) {
+  const cookie_name = `cookie-${tenantId}`;
+  const cookies = event.headers.cookie || "";
+  
+  const cookieValue = findCookie(cookies, cookie_name);
+  if (!cookieValue) {
     return {
       statusCode: 401,
       body: JSON.stringify({ error: "Unauthorized: Missing session cookie" }),
@@ -46,12 +51,20 @@ export async function handler(event) {
   }
 
   try {
-    const mongo = await getClient();
-    const db = mongo.db(process.env.DB_NAME);
+    const db = await getDB();
+
+    const user_id = parseID(cookieValue);
+    if (!user_id) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Invalid user ID in cookie" }),
+      };
+    }
 
     const result = await db.collection("readers").updateOne(
-      { _id: ObjectId.createFromHexString(cookie.id) },
-      { $set: { page_reached: blockReached } }
+      { _id: user_id },
+      { $set: { block_reached: blockReached } }
     );
 
     if (result.matchedCount === 0) {
@@ -71,22 +84,4 @@ export async function handler(event) {
       body: JSON.stringify({ "error": "DB Error" })
     }
   }
-}
-
-const parseCookie = (cookieHeader, name) => {
-  if (!cookieHeader) return null;
-
-  const cookies = cookieHeader.split(";").map(c => c.trim());
-  for (let c of cookies) {
-    const [k, v] = c.split("=");
-    if (k === name) {
-      try {
-        return JSON.parse(decodeURIComponent(v));
-      } catch (err) {
-        console.error("Failed to parse cookie JSON:", err);
-        return null;
-      }
-    }
-  }
-  return null;
 }

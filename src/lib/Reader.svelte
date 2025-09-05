@@ -1,277 +1,82 @@
-<script lang="ts">
-  let currentParagraphId = null;  // shared state
-
-  let visibleParagraphs = $state([]);
-
-   // 1. Create observer once
-  const paragraphObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      const id = entry.target.id;
-      if (entry.isIntersecting) {
-        if (!visibleParagraphs.includes(id)) visibleParagraphs.push(id);
-      } else {
-        visibleParagraphs = visibleParagraphs.filter(p => p !== id);
-      }
-    });
-  }, { threshold: 0.6 }); // visible if 60% in view
-
-  // Returns the topmost visible paragraph
-// function getTopmostParagraph() {
-//   const visible = Array.from(visibleParagraphs); // from your Set
-//   if (visible.length === 0) return null;
-
-//   return visible.reduce((topmost, current) => {
-//     const topTop = topmost.getBoundingClientRect().top;
-//     const currentTop = current.getBoundingClientRect().top;
-//     return currentTop < topTop ? current : topmost;
-//   });
-// }
-
-// Returns the topmost visible paragraph
-function getTopmostParagraph() {
-  if (visibleParagraphs.length === 0) return null;
-
-  return visibleParagraphs
-    .map(id => document.getElementById(id))   // convert ID → element
-    .filter(el => el !== null)                // ignore if not found
-    .reduce((topmost, current) => {
-      const topTop = topmost.getBoundingClientRect().top;
-      const currentTop = current.getBoundingClientRect().top;
-      return currentTop < topTop ? current : topmost;
-    });
-}
-
-
-function canUserScroll() {
-  return document.documentElement.scrollHeight > window.innerHeight;
-}
-
-
-
-  // The observer keeps this updated
-  // const paragraphObserver = new IntersectionObserver((entries) => {
-  //   const visible = entries
-  //     .filter(e => e.isIntersecting)
-  //     .map(e => e.target);
-
-  //   if (visible.length > 0) {
-  //     // Pick the first visible one in document order
-  //     visible.sort((a, b) => a.offsetTop - b.offsetTop);
-  //     currentParagraphId = visible[0].id;
-  //   }
-  // }, { threshold: 0.5 }); // 50% visible before we "count it"
-
-
-  // const observer = new IntersectionObserver((entries) => {
-  //   entries.forEach(entry => {
-  //     if (entry.isIntersecting) {
-  //       console.log("Visible:", entry.target.id);
-  //     } else {
-  //       console.log("Not visible:", entry.target.id);
-  //     }
-  //   });
-  // }, { threshold: 0.5 }); // 50% visible counts as "in view"
-
-
-
-
-
-
-
-
-
-//   function createParagraphObserver(callback) {
-//     const observer = new IntersectionObserver((entries) => {
-//       const visibleParagraphs = [];
-
-//       for(const entry of entries) {
-//         if (entry.isIntersecting) {
-//           visibleParagraphs.push(entry.target)
-//         }
-//       }
-
-//       callback(visibleParagraphs);
-//     }, {
-//       root: null,
-//       threshold: 0.1
-//     });
-
-//     return observer;
-//   }
-
-// // --- USAGE EXAMPLE ---
-
-// // 1. Create the observer
-// const paragraphObserver = createParagraphObserver((visible) => {
-//   console.log("Currently visible paragraphs:", visible.map(p => p.id));
-// });
-
-// // 2. Attach it to all paragraphs
-// document.querySelectorAll("p[id^='paragraph-']").forEach(p => {
-//   paragraphObserver.observe(p);
-// });
-
-
-//   function createPageObserver(callback) {
-//   const observer = new IntersectionObserver((entries) => {
-//     let maxPage = 0;
-//     for (const entry of entries) {
-//       if (entry.isIntersecting) {
-//         const pageNum = parseInt(entry.target.page, 10);
-//         maxPage = Math.max(maxPage, pageNum);
-//       }
-//     }
-
-//     const canScroll = document.body.scrollHeight > window.innerHeight;
-//     callback({ currentPage: maxPage, canScroll });  
-//   }, {
-//     root: null,
-//     threshold: 0.5, // half of element visible counts
-//   });
-
-//   return observer;
-// }
-
-
-  const { data } = $props();
-  const { userEmail, userName } = data;
-
-  const timer = createTimer();
-  const reader = createReader();
-  const countdown = timer.countdown;
-
-  let pageReached = $state(0);
-
-
-  // let's see.
-  // we have the maximum page reached
-
-  // as each page is revealed.
-  // the maximum page reached is increased
-
-
-  // for next, check the maximum page reached
-  // check the page number of the last page in that chapter
-  // if the maximum page is greater than it, then allow next
-  // if it is less than, do not allow -- you've not reached
-  // if it is equal, then you're just about to switch
-
-
-  
-
-  let pageList = $state(null);
-  let lastPageNumber = $derived(pageList[pageList.length -1].number);
-
-  let currentPage = $state(Number(localStorage.getItem(`${userEmail}:currentPage`) ?? 0));
-
-  const loadPageReached = () => {
-    return Number(localStorage.getItem(`${userEmail}:pageReached`) ?? 0);
-  }
-
-  const savePageReached = (val) => {
-    localStorage.setItem(`${userEmail}:pageReached`, String(val));
-  }
-
-  // onMount(() => {
-  //   reader.load(data);
-
-  //   blocks = reader.getBlocks();
-  //   blockReached = data.blockReached;
-
-  //   // pageReached = loadPageReached();
-
-  //   // currentPage = 0;
-  //   // pageList = reader.getCurrentChapter(currentPage).pages;
-
-  //   // startTimer();
-  //   start();
-  // });
-
-  // let intervalId = null;
-
-  // const startTimer = () => {
-
-  //   // I only want to increment the pageReached on when?
-  //   // Because in the advent that someone scrolls to a different chapter
-  //   // Will this timer keep on increasing the pageReached?
-
-  //   // So what's an idea here?
-
-  //   intervalId = setInterval(() => {
-  //     pageReached += 1; // do some checks here sha.
-
-  //     if (pageReached % 5 === 0) {
-  //       savePageReached(pageReached);
-  //     }
-  //   }, 3000);
-  // }
-
-  const start = () => {
-    const interval = setInterval(() => {
-      console.log(getTopmostParagraph())
-      console.log(`can user scroll: ${canUserScroll()}`)
-
-      if (currentPage < lastPageNumber) {
-        currentPage += 1;
-        localStorage.setItem(`${userEmail}:currentPage`, String(currentPage));
-      } else {
-        clearInterval(interval);
-      }
-    }, 3000);
-  }
-
-  const next = () => {
-    pageList = reader.getNextChapter(currentPage).pages;
-    start();
-
-    // make a call to the db that the user has finished that chapter
-    // it loads until it's done.
-  }
-
-  const onClickPrevious = () => {
-    pageList = reader.getPreviousChapter(currentPage);
-  }
-
-
-  
-  
+<script lang="ts">  
   import { createReader } from "../utils/reader";
-  import { createTimer } from "../utils/timer";
+  import { createSaver } from "../utils/saver";
   
   import { SvelteSet } from 'svelte/reactivity';
+  import { fade } from 'svelte/transition';
   import { onMount } from "svelte";
   
+  import NetworkError from "./NetworkError.svelte";
+
   import ChapterHeader from "./ChapterHeader.svelte";
+  import LoadingBlock from "./LoadingBlock.svelte";
   import Paragraph from "./Paragraph.svelte";
+  import Welcome from "./Welcome.svelte";
   import Panel from "./Panel.svelte";
+    
 
+  const { data, tenantId } = $props();
+  const reader = createReader();
+  const saver = createSaver();
 
-  let darkMode = $state(localStorage.getItem('theme') === 'dark' || localStorage.getItem('theme') === null);
   let visibleBlocks = $state(new SvelteSet<number>());
+  let saveIntervalId = $state(null);
   let intervalId = $state(null);
+  let isFailed = $state(false);
+  let pending = $state(false);
 
+  let toc = $state([]);
+  let name = $state('');
   let blocks = $state(null); // the json array of blocks i.e paragraphs
   let blockReached = $state(0); // the stored 'paragraph number' on the server
-  let currentChapter = $state(localStorage.getItem(`${userEmail}:currentChapter`) ?? 'Chapter-1'); // used for navigation -- either by # (deep link) or swiping.
 
-  const toggleTheme = () => {
-    darkMode = !darkMode;
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-  }
+  let display: 'WELCOME' | 'READING' | 'ERROR' = $state('WELCOME');
+  const unlockedChapters = $derived(toc.filter(ch => ch.start_page <= blockReached));
 
   onMount(() => {
+    saver.init(tenantId);
     reader.load(data);
+
+    toc = reader.getTOC();
+    name = reader.getName();
     blocks = reader.getBlocks();
-    blockReached = data.blockReached;
+    blockReached = reader.getBlockReached();
+  });
+
+  const onClickLogout = () => {
+    reader.logout(tenantId);
+  }
+
+  const onClickContinue = () => {
+    display = 'READING';
 
     startTimer();
+    startSaveTimer();
+  }
 
-    reader.save(50);
-    reader.save(55);
-  });
+  const startSaveTimer = () => {
+    saveIntervalId = setInterval(() => {
+      console.log(`save interval`);
+      
+      saver.save(blockReached)
+    }, 10 * 1000); // 10 seconds
+  }
 
   const startTimer = () => {
     intervalId = setInterval(() => {
+      if (saver.getFailed()) {
+        display = 'ERROR';
+        isFailed = true;
+        return;
+      }
+
+      if (saver.getFailureCount() >= 2 || saver.getIsPending() === true) {
+        pending = true;
+        return;
+      }
+
+      pending = false;
+
       if (visibleBlocks.size > 0) {
         const maxVisible = Math.max(...visibleBlocks);
         if (maxVisible >= blockReached - 5) {
@@ -282,11 +87,7 @@ function canUserScroll() {
       } else {
         blockReached += 1;
       }
-
-      if (blockReached % 5 === 0) {
-        savePageReached(pageReached); // change this to be the actual saving part. hand it off to reader.
-      }
-    }, 3000);
+    }, 3 * 1000); // 3 seconds
   }
 
   const observer = new IntersectionObserver((entries) => {
@@ -316,22 +117,38 @@ function canUserScroll() {
   
 </script>
 
-<div class={`min-h-screen p-6 transition-colors duration-500 ${darkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-300 text-gray-900'}`}>
-  <div class="max-w-xl mx-auto bg-inherit">
-    {#if blocks}
-      {#each blocks as block, index}
-        {#if block.type}
-          {#if block.number <= blockReached} <!-- only show the paragraphs up to where the system has revealed -->
-            <ChapterHeader {block} {observe}/>
+{#if display === 'READING'}
+  <div class="flex flex-col items-start justify-start min-h-screen px-4 bg-white dark:bg-gray-950 transition-colors duration-500"> 
+    <div class="max-w-xl mx-auto">
+      {#if blocks}
+        {#each blocks as block, index}
+          {#if block.type}
+            {#if block.number <= blockReached} <!-- only show the paragraphs up to where the system has revealed -->
+              <ChapterHeader {block} {observe}/>
+            {/if}
+          {:else}
+            {#if block.number <= blockReached}
+              <Paragraph {block} {observe}/>
+            {/if}
           {/if}
-        {:else}
-          {#if block.number <= blockReached}
-            <Paragraph {block} {observe}/>
-          {/if}
-        {/if}
-      {/each}
-    {/if}
+        {/each}
 
-    <Panel {toggleTheme} {onClickPrevious} {reader} {currentPage} {darkMode}/>    
+        {#if pending}
+          <LoadingBlock/>
+        {/if}
+      {/if}
+
+      <Panel {unlockedChapters} {toc} {visibleBlocks}/> 
+    </div>
   </div>
-</div>
+
+{:else if display === 'WELCOME'}
+  <div transition:fade="{{ duration: 300 }}">
+    <Welcome {name} {onClickContinue} {onClickLogout}/>
+  </div>
+
+{:else if display === 'ERROR'}
+  <div transition:fade="{{ duration: 300 }}">
+    <NetworkError/>
+  </div>
+{/if}

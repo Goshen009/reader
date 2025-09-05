@@ -9,3 +9,8 @@ export async function getClient() {
   }
   return client;
 }
+
+export async function getDB() {
+  const mongo = await getClient();
+  return mongo.db(process.env.DB_NAME);
+}

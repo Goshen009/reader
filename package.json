@@ -15,12 +15,15 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.12",
     "axios": "^1.11.0",
     "crypto": "^1.0.1",
     "dayjs": "^1.11.18",
+    "email-validator": "^2.0.4",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.19.0",
     "neverthrow": "^8.2.0",
-    "render": "^0.1.4"
+    "render": "^0.1.4",
+    "tailwindcss": "^4.1.12"
   }
 }

@@ -4,11 +4,6 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script> -->
-
     <title>Vite + Svelte</title>
   </head>
   <body>
@@ -16,3 +11,24 @@
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+
+
+
+<!-- ✅ Step 4: Prevent Flash of Unstyled Content (FOUC)
+
+To prevent FOUC during the initial load, add the following script in your index.html:
+
+<script>
+  const html = document.documentElement;
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  if (savedTheme) {
+    html.classList.add(savedTheme);
+  } else {
+    html.classList.add(prefersDark ? 'dark' : 'light');
+  }
+</script>
+
+
+This script ensures that the correct theme is applied before the page is rendered, eliminating any flicker . -->

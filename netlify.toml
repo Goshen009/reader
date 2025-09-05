@@ -27,5 +27,23 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/read"
+  to = "/.netlify/functions/read"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "/.netlify/functions/login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/logout"
+  to = "/.netlify/functions/logout"
+  status = 200
+  force = true
+
 [functions]
   node_bundler = "esbuild"
